@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1e3a8a">
+  <title>ガス流量計算機</title>
+  <style>
+    :root {
+      --blue:    #1d4ed8;
+      --blue-dk: #1e3a8a;
+      --blue-lt: #eff6ff;
+      --amber:   #d97706;
+      --amber-bg:#fffbeb;
+      --amber-bd:#fbbf24;
+      --green-dk:#064e3b;
+      --green-md:#065f46;
+      --bg:      #f1f5f9;
+      --card:    #ffffff;
+      --txt:     #1e293b;
+      --muted:   #64748b;
+      --border:  #e2e8f0;
+      --rad:     13px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0;
+        -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, 'Hiragino Sans', 'Yu Gothic UI',
+                   'Noto Sans JP', sans-serif;
+      background: var(--bg);
+      color: var(--txt);
+      min-height: 100dvh;
+      padding-bottom: 36px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(150deg, var(--blue-dk) 0%, var(--blue) 100%);
+      color: #fff;
+      padding: 16px 16px 0;
+      position: sticky; top: 0; z-index: 10;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    header h1 { font-size: 16px; font-weight: 800; letter-spacing: .03em;
+                text-align: center; padding-bottom: 10px; }
+
+    /* ── Tab bar (inside header) ── */
+    .tabs {
+      display: flex; gap: 4px; padding: 0 4px;
+    }
+    .tab-btn {
+      flex: 1; padding: 8px 4px;
+      background: rgba(255,255,255,0.15);
+      border: none; border-radius: 8px 8px 0 0;
+      color: rgba(255,255,255,0.7);
+      font-size: 12px; font-weight: 700;
+      cursor: pointer; text-align: center; line-height: 1.3;
+      transition: all .2s;
+    }
+    .tab-btn.on {
+      background: var(--bg);
+      color: var(--blue-dk);
+    }
+
+    /* ── Card ── */
+    .wrap { padding: 13px; max-width: 520px; margin: 0 auto; }
+    .sec  { display: none; }
+    .sec.on { display: block; }
+    .card {
+      background: var(--card);
+      border-radius: var(--rad);
+      padding: 15px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .card-lbl {
+      font-size: 10.5px; font-weight: 700; color: var(--muted);
+      letter-spacing: .08em; text-transform: uppercase; margin-bottom: 11px;
+    }
+
+    /* ── Gas type buttons ── */
+    .gas-row { display: flex; gap: 7px; }
+    .gas-btn {
+      flex: 1; padding: 9px 5px;
+      border: 2px solid var(--border); border-radius: 9px;
+      background: #fff; cursor: pointer;
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      text-align: center; line-height: 1.3; transition: all .18s;
+    }
+    .gas-btn small { display: block; font-size: 10px; font-weight: 400; margin-top: 2px; }
+    .gas-btn.on { border-color: var(--blue); background: var(--blue-lt); color: var(--blue); }
+    .gas-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Variable rows (shared) ── */
+    .var-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 0; border-bottom: 1px solid var(--border);
+    }
+    .var-row:last-child { border-bottom: none; }
+    .var-radio { width: 22px; height: 22px; flex-shrink: 0;
+                 accent-color: var(--amber); cursor: pointer; }
+    .var-info  { flex: 1; min-width: 0; }
+    .var-info strong { font-size: 14px; font-weight: 700; display: block; }
+    .var-info .unit  { font-size: 11px; color: var(--muted); }
+    .var-field { width: 118px; flex-shrink: 0; }
+    .var-input {
+      width: 100%; padding: 10px 9px;
+      border: 2px solid var(--border); border-radius: 9px;
+      font-size: 15px; font-weight: 700; text-align: right;
+      background: #fff; color: var(--txt);
+      transition: border-color .15s; -webkit-appearance: none;
+    }
+    .var-input:focus { outline: none; border-color: var(--blue); }
+    .var-input.unk {
+      background: var(--amber-bg); border-color: var(--amber-bd);
+      color: var(--amber); pointer-events: none; font-style: italic;
+    }
+
+    /* ── Specific gravity mini-tags ── */
+    .s-tags { display: flex; gap: 5px; margin-top: 5px; }
+    .s-tag {
+      padding: 3px 8px; border: 1.5px solid var(--border); border-radius: 6px;
+      font-size: 10px; font-weight: 700; cursor: pointer;
+      background: #fff; color: var(--muted); transition: all .15s;
+    }
+    .s-tag.on { border-color: var(--blue); background: var(--blue-lt); color: var(--blue); }
+    .s-tag:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Pipe size reference (Pole section) ── */
+    .pipe-toggle {
+      width: 100%; padding: 10px; background: #f8fafc;
+      border: 1.5px solid var(--border); border-radius: 9px;
+      font-size: 12.5px; color: var(--muted); cursor: pointer;
+      font-weight: 600; text-align: center;
+    }
+    .pipe-section { display: none; margin-top: 10px; }
+    .pipe-section.open { display: block; }
+    .pipe-hint { font-size: 10.5px; color: var(--muted); margin-bottom: 6px; }
+    .pipe-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+    .pipe-cell {
+      padding: 7px 4px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 11.5px; font-weight: 700; text-align: center;
+      cursor: pointer; background: #fff; color: var(--txt);
+      transition: all .15s; line-height: 1.4;
+    }
+    .pipe-cell small { display: block; font-size: 9.5px; color: var(--muted); font-weight: 400; }
+    .pipe-cell.chosen,
+    .pipe-cell:active  { background: var(--blue-lt); border-color: var(--blue); color: var(--blue); }
+
+    /* ── Flexi pipe size selector ── */
+    .fsize-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .fsize-btn {
+      padding: 10px 4px; border: 2px solid var(--border); border-radius: 9px;
+      font-size: 13px; font-weight: 800; text-align: center;
+      cursor: pointer; background: #fff; color: var(--txt);
+      transition: all .18s;
+    }
+    .fsize-btn.on  { background: var(--blue-lt); border-color: var(--blue); color: var(--blue); }
+    .fsize-btn:disabled { opacity: .3; cursor: not-allowed; background: #f8fafc; }
+
+    /* ── Buttons ── */
+    .calc-btn {
+      width: 100%; padding: 17px;
+      background: linear-gradient(135deg, var(--blue-dk) 0%, var(--blue) 100%);
+      color: #fff; border: none; border-radius: var(--rad);
+      font-size: 18px; font-weight: 800; letter-spacing: .06em;
+      cursor: pointer; box-shadow: 0 4px 14px rgba(30,58,138,.4);
+      transition: transform .1s, box-shadow .1s; margin-bottom: 10px;
+    }
+    .calc-btn:active { transform: scale(.97); }
+    .reset-btn {
+      width: 100%; padding: 11px;
+      background: #fff; border: 1.5px solid var(--border);
+      border-radius: 9px; font-size: 13.5px; color: var(--muted);
+      cursor: pointer; font-weight: 600;
+    }
+
+    /* ── Result ── */
+    .result {
+      border-radius: var(--rad); padding: 18px 16px;
+      background: linear-gradient(135deg, var(--green-dk) 0%, var(--green-md) 100%);
+      color: #fff; text-align: center; display: none; margin-bottom: 10px;
+      box-shadow: 0 4px 14px rgba(6,79,59,.35);
+    }
+    .result.show { display: block; }
+    .r-label { font-size: 12px; opacity: .75; margin-bottom: 2px; }
+    .r-wrap  { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+    .r-num   { font-size: 42px; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+    .r-unit  { font-size: 15px; opacity: .8; }
+    .r-sub   { font-size: 11px; opacity: .7; margin-top: 8px; line-height: 1.7; }
+
+    /* ── Error ── */
+    .err {
+      background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c;
+      padding: 11px 13px; border-radius: 9px; font-size: 13px;
+      margin-bottom: 10px; display: none;
+    }
+    .err.show { display: block; }
+
+    /* ── Note ── */
+    .note { font-size: 11.5px; color: var(--muted); line-height: 1.75; }
+    .note code {
+      font-family: 'Courier New', monospace; font-size: 11px;
+      background: #f1f5f9; padding: 1px 4px; border-radius: 3px;
+    }
+    .note table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+    .note td, .note th {
+      border: 1px solid var(--border); padding: 4px 6px; font-size: 10.5px;
+    }
+    .note th { background: #f8fafc; font-weight: 700; }
+    .warn-box {
+      background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px;
+      padding: 10px 12px; font-size: 11.5px; color: #92400e;
+      margin-bottom: 10px; line-height: 1.65;
+    }
+
+    /* ── Q energy unit selector ── */
+    .q-unit-sel {
+      display: flex; gap: 3px; margin-top: 5px; justify-content: flex-end;
+    }
+    .q-unit-btn {
+      padding: 2px 6px; border: 1.5px solid var(--border); border-radius: 5px;
+      font-size: 9.5px; font-weight: 700; cursor: pointer;
+      background: #fff; color: var(--muted); transition: all .15s;
+    }
+    .q-unit-btn.on { border-color: var(--blue); background: var(--blue-lt); color: var(--blue); }
+    .q-unit-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* ── Energy result row ── */
+    .r-energy {
+      font-size: 14px; margin-top: 8px;
+      border-top: 1px solid rgba(255,255,255,.3); padding-top: 8px;
+      line-height: 1.6;
+    }
+
+    /* ── Elevation correction ── */
+    .corr-chk-label {
+      display: flex; align-items: center; gap: 9px;
+      font-size: 13px; font-weight: 700; cursor: pointer; color: var(--txt);
+    }
+    .corr-chk-label input[type="checkbox"] {
+      width: 18px; height: 18px; accent-color: var(--blue);
+      cursor: pointer; flex-shrink: 0;
+    }
+    .corr-hint {
+      font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.7;
+    }
+    .corr-hint code {
+      font-family: 'Courier New', monospace; font-size: 10.5px;
+      background: #f1f5f9; padding: 1px 4px; border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>ガス流量計算機</h1>
+  <div class="tabs">
+    <button class="tab-btn on"  onclick="showTab('pole')">鋼管・鋳鉄管<br><small>ポールの式</small></button>
+    <button class="tab-btn"     onclick="showTab('flexi')">フレキシブル管<br><small>グラフ読取り</small></button>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ══════════════════════════════════════════
+     TAB 1 : ポールの式
+══════════════════════════════════════════ -->
+<div id="sec-pole" class="sec on">
+
+  <div class="card">
+    <div class="card-lbl">求める項目のラジオを選択し、残り4項目を入力</div>
+
+    <!-- Q -->
+    <div class="var-row">
+      <input type="radio" name="pUnk" class="var-radio" id="pRQ" value="Q"
+             checked onchange="pSetUnk('Q')">
+      <label class="var-info" for="pRQ">
+        <strong>流量　Q</strong><span class="unit" id="pQUnitLabel">m³/h</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="pVQ" class="var-input unk"
+               placeholder="← 算出" readonly inputmode="decimal" step="any" min="0">
+        <div class="q-unit-sel" id="pQUnitSel" style="display:none;">
+          <button class="q-unit-btn on" id="pQU_m3"   onclick="pSetQUnit('m3')">m³/h</button>
+          <button class="q-unit-btn"    id="pQU_kw"   onclick="pSetQUnit('kw')">kW</button>
+          <button class="q-unit-btn"    id="pQU_kcal" onclick="pSetQUnit('kcal')">kcal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- S -->
+    <div class="var-row">
+      <input type="radio" name="pUnk" class="var-radio" id="pRS" value="S"
+             onchange="pSetUnk('S')">
+      <label class="var-info" for="pRS">
+        <strong>比重　S</strong><span class="unit">空気 = 1</span>
+        <div class="s-tags">
+          <button class="s-tag on" id="pSCity"   onclick="pSetGas('city')">都市 0.638</button>
+          <button class="s-tag"    id="pSLp"     onclick="pSetGas('lp')">LP 1.550</button>
+          <button class="s-tag"    id="pSCustom" onclick="pSetGas('custom')">その他</button>
+        </div>
+      </label>
+      <div class="var-field">
+        <input type="number" id="pVS" class="var-input" value="0.638"
+               readonly inputmode="decimal" step="any" min="0">
+      </div>
+    </div>
+
+    <!-- L -->
+    <div class="var-row">
+      <input type="radio" name="pUnk" class="var-radio" id="pRL" value="L"
+             onchange="pSetUnk('L')">
+      <label class="var-info" for="pRL">
+        <strong>配管延長　L</strong><span class="unit">m</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="pVL" class="var-input"
+               placeholder="例: 30" inputmode="decimal" step="any" min="0">
+      </div>
+    </div>
+
+    <!-- D -->
+    <div class="var-row">
+      <input type="radio" name="pUnk" class="var-radio" id="pRD" value="D"
+             onchange="pSetUnk('D')">
+      <label class="var-info" for="pRD">
+        <strong>口径　D</strong><span class="unit">cm（管内径）</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="pVD" class="var-input"
+               placeholder="例: 2.76" inputmode="decimal" step="any" min="0">
+      </div>
+    </div>
+
+    <!-- P -->
+    <div class="var-row">
+      <input type="radio" name="pUnk" class="var-radio" id="pRP" value="P"
+             onchange="pSetUnk('P')">
+      <label class="var-info" for="pRP">
+        <strong>圧力損失　&Delta;P</strong><span class="unit">kPa</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="pVP" class="var-input"
+               placeholder="例: 0.3" inputmode="decimal" step="any" min="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- SGP inner diameter reference -->
+  <div class="card">
+    <button class="pipe-toggle" id="pPipeToggle" onclick="pTogglePipe()">▼　SGP内径早見表（タップでD自動入力）</button>
+    <div class="pipe-section" id="pPipeSection">
+      <div class="pipe-grid" id="pPipeGrid"></div>
+    </div>
+  </div>
+
+  <!-- Elevation correction card (Pole) -->
+  <div class="card">
+    <div class="card-lbl">高低差による圧力補正（任意）</div>
+    <label class="corr-chk-label">
+      <input type="checkbox" id="pCorrOn" onchange="pCorrToggle()">
+      <span>補正を有効にする</span>
+    </label>
+    <div id="pCorrFields" style="display:none; margin-top:12px;">
+      <div class="var-row" style="border-bottom:none; padding:4px 0 0;">
+        <div class="var-info">
+          <strong>高低差　h</strong>
+          <span class="unit">m（正＝上り、負＝下り）</span>
+        </div>
+        <div class="var-field">
+          <input type="number" id="pVH" class="var-input"
+                 placeholder="例: 5" inputmode="decimal" step="any">
+        </div>
+      </div>
+      <div class="corr-hint">
+        <code>P = h × 1.293 × 9.807/1000 × (1−S) ≈ h × 0.01268 × (1−S) kPa</code><br>
+        正の値 = ガス圧が高くなる方向（軽いガスの上り等）
+      </div>
+    </div>
+  </div>
+
+  <div class="err" id="pErr"></div>
+  <button class="calc-btn" onclick="pCalc()">計　　算</button>
+  <div class="result" id="pResult">
+    <div class="r-label" id="pRLabel"></div>
+    <div class="r-wrap">
+      <span class="r-num" id="pRNum">—</span>
+      <span class="r-unit" id="pRUnit"></span>
+    </div>
+    <div class="r-energy" id="pREnergy" style="display:none;"></div>
+    <div class="r-sub" id="pRSub"></div>
+  </div>
+  <button class="reset-btn" onclick="pReset()">リセット</button>
+
+  <div class="card" style="margin-top:10px;">
+    <div class="card-lbl">ポールの式</div>
+    <div class="note">
+      <code>Q = K · D^2.5 · √(h / (S · L))</code><br>
+      K = 0.707（低圧、h: mmAq、D: cm、Q: m³/h）<br>
+      kPa単位では K = 0.707 × √101.972 ≈ <strong>7.139</strong><br>
+      D：管内径[cm]　L：管長[m]　h：圧力損失[mmAq]　S：比重
+    </div>
+  </div>
+
+</div><!-- sec-pole -->
+
+
+<!-- ══════════════════════════════════════════
+     TAB 2 : フレキシブル管
+══════════════════════════════════════════ -->
+<div id="sec-flexi" class="sec">
+
+  <div class="warn-box">
+    グラフから近似値を読み取って計算しています。<br>
+    曲がり（フレキ管2mに1箇所、R=50mm）の影響を含む。<br>
+    最終判断は必ず製造者のグラフで確認してください。
+  </div>
+
+  <!-- Gas type -->
+  <div class="card">
+    <div class="card-lbl">ガス種別・比重</div>
+    <div class="gas-row">
+      <button class="gas-btn on" id="fGasCity"   onclick="fSetGas('city')">
+        都市ガス<small>比重 0.638</small>
+      </button>
+      <button class="gas-btn"    id="fGasLp"     onclick="fSetGas('lp')">
+        LP ガス<small>比重 1.550</small>
+      </button>
+      <button class="gas-btn"    id="fGasCustom" onclick="fSetGas('custom')">
+        その他<small>比重を入力</small>
+      </button>
+    </div>
+    <div id="fSRow" style="margin-top:10px; display:none;">
+      <label style="font-size:12px; font-weight:700; color:var(--muted);">比重 S（空気=1）</label>
+      <input type="number" id="fVS" class="var-input"
+             style="width:120px; margin-top:6px; display:block;"
+             placeholder="例: 0.638" inputmode="decimal" step="any" min="0">
+    </div>
+  </div>
+
+  <!-- Pipe size -->
+  <div class="card">
+    <div class="card-lbl">口径選択</div>
+    <div class="fsize-grid" id="fSizeGrid"></div>
+    <div style="font-size:10.5px; color:var(--muted); margin-top:8px;" id="fSizeNote"></div>
+  </div>
+
+  <!-- Variables -->
+  <div class="card">
+    <div class="card-lbl">求める項目を選択し、残り2項目を入力</div>
+
+    <!-- Q -->
+    <div class="var-row">
+      <input type="radio" name="fUnk" class="var-radio" id="fRQ" value="Q"
+             onchange="fSetUnk('Q')">
+      <label class="var-info" for="fRQ">
+        <strong>流量　Q</strong><span class="unit" id="fQUnitLabel">m³/h</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="fVQ" class="var-input"
+               placeholder="例: 1.5" inputmode="decimal" step="any" min="0">
+        <div class="q-unit-sel" id="fQUnitSel" style="display:none;">
+          <button class="q-unit-btn on" id="fQU_m3"   onclick="fSetQUnit('m3')">m³/h</button>
+          <button class="q-unit-btn"    id="fQU_kw"   onclick="fSetQUnit('kw')">kW</button>
+          <button class="q-unit-btn"    id="fQU_kcal" onclick="fSetQUnit('kcal')">kcal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- L -->
+    <div class="var-row">
+      <input type="radio" name="fUnk" class="var-radio" id="fRL" value="L"
+             onchange="fSetUnk('L')">
+      <label class="var-info" for="fRL">
+        <strong>配管延長　L</strong><span class="unit">m</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="fVL" class="var-input"
+               placeholder="例: 10" inputmode="decimal" step="any" min="0">
+      </div>
+    </div>
+
+    <!-- P -->
+    <div class="var-row">
+      <input type="radio" name="fUnk" class="var-radio" id="fRP" value="P"
+             checked onchange="fSetUnk('P')">
+      <label class="var-info" for="fRP">
+        <strong>圧力損失　&Delta;P</strong><span class="unit">kPa</span>
+      </label>
+      <div class="var-field">
+        <input type="number" id="fVP" class="var-input unk"
+               placeholder="← 算出" readonly inputmode="decimal" step="any" min="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- Elevation correction card (Flexi) -->
+  <div class="card">
+    <div class="card-lbl">高低差による圧力補正（任意）</div>
+    <label class="corr-chk-label">
+      <input type="checkbox" id="fCorrOn" onchange="fCorrToggle()">
+      <span>補正を有効にする</span>
+    </label>
+    <div id="fCorrFields" style="display:none; margin-top:12px;">
+      <div class="var-row" style="border-bottom:none; padding:4px 0 0;">
+        <div class="var-info">
+          <strong>高低差　h</strong>
+          <span class="unit">m（正＝上り、負＝下り）</span>
+        </div>
+        <div class="var-field">
+          <input type="number" id="fVH" class="var-input"
+                 placeholder="例: 5" inputmode="decimal" step="any">
+        </div>
+      </div>
+      <div class="corr-hint">
+        <code>P = h × 1.293 × 9.807/1000 × (1−S) ≈ h × 0.01268 × (1−S) kPa</code><br>
+        正の値 = ガス圧が高くなる方向（軽いガスの上り等）
+      </div>
+    </div>
+  </div>
+
+  <div class="err" id="fErr"></div>
+  <button class="calc-btn" onclick="fCalc()">計　　算</button>
+  <div class="result" id="fResult">
+    <div class="r-label" id="fRLabel"></div>
+    <div class="r-wrap">
+      <span class="r-num"  id="fRNum">—</span>
+      <span class="r-unit" id="fRUnit"></span>
+    </div>
+    <div class="r-energy" id="fREnergy" style="display:none;"></div>
+    <div class="r-sub" id="fRSub"></div>
+  </div>
+  <button class="reset-btn" onclick="fReset()">リセット</button>
+
+  <div class="card" style="margin-top:10px;">
+    <div class="card-lbl">計算方法について</div>
+    <div class="note">
+      グラフから読み取ったべき乗近似式を使用：<br>
+      <code>ΔP/L [mmH₂O/m] = C × Q^n</code><br><br>
+      <strong>都市ガス用グラフ</strong>（口径：8A〜32A）<br>
+      空気流量に換算して使用：<code>Qair = √S × Qgas</code><br>
+      n = 1.85（全サイズ共通）<br><br>
+      <strong>LPG用グラフ</strong>（口径：10A〜25A）<br>
+      LPGガス流量で直接使用：n = 2.0（全サイズ共通）<br><br>
+      1 mmH₂O = 0.00981 kPa　/　1 kPa = 101.97 mmH₂O<br>
+      出典：日本ガス協会・高圧ガス保安協会の各資料
+    </div>
+  </div>
+
+</div><!-- sec-flexi -->
+
+</div><!-- wrap -->
+
+<script>
+// ═══════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════
+const K_POLE     = 7.139;       // Pole's formula kPa constant
+                                 // Low pressure: K=0.707 (mmAq, D[cm], Q[m³/h])
+                                 // K_kPa = 0.707 × √101.972 = 7.139
+const MMH2O_KPA  = 0.00980665;  // 1 mmH₂O → kPa
+const KPA_MMH2O  = 101.972;     // 1 kPa → mmH₂O
+const G_CORR     = 1.293 * 9.80665 / 1000; // ≈ 0.012677 kPa/m per (1-S) — elevation correction
+
+// ─── Flexible pipe power-law coefficients ───
+// City gas: ΔP/L [mmH₂O/m] = C × Qair^n   (Qair = √S × Qgas)
+// Calibrated at ΔP/L=1.0 for each pipe's reference air flow from the graph.
+// n=1.85 for all city gas sizes.
+const CITY_FLEXI = {
+  '8A' : { C: 16.4,   n: 1.85, qMin:0.07, qMax:0.50  },
+  '10A': { C: 2.42,   n: 1.85, qMin:0.15, qMax:1.2   },
+  '15A': { C: 0.714,  n: 1.85, qMin:0.25, qMax:2.5   },
+  '18A': { C: 0.410,  n: 1.85, qMin:0.35, qMax:3.5   },
+  '20A': { C: 0.265,  n: 1.85, qMin:0.50, qMax:4.5   },
+  '25A': { C: 0.0735, n: 1.85, qMin:1.0,  qMax:8.0   },
+  '32A': { C: 0.0241, n: 1.85, qMin:1.5,  qMax:12.0  },
+};
+// LPG: ΔP/L [mmH₂O/m] = C × Qlpg^n   (direct LPG flow, n=2.0)
+const LPG_FLEXI = {
+  '10A': { C: 3.43,   n: 2.0, qMin:0.1,  qMax:1.2  },
+  '15A': { C: 0.783,  n: 2.0, qMin:0.2,  qMax:2.5  },
+  '20A': { C: 0.196,  n: 2.0, qMin:0.4,  qMax:5.0  },
+  '25A': { C: 0.0556, n: 2.0, qMin:0.7,  qMax:8.0  },
+};
+
+// SGP inner diameters for Pole's formula reference
+const SGP = [
+  {nom:'15A', id:1.61}, {nom:'20A', id:2.16},
+  {nom:'25A', id:2.76}, {nom:'32A', id:3.60},
+  {nom:'40A', id:4.16}, {nom:'50A', id:5.27},
+  {nom:'65A', id:6.79}, {nom:'80A', id:8.07},
+  {nom:'100A',id:10.53},{nom:'125A',id:13.08},
+  {nom:'150A',id:15.52},{nom:'200A',id:20.40},
+];
+
+// ═══════════════════════════════════════════
+//  ENERGY CONVERSION HELPERS
+// ═══════════════════════════════════════════
+function getEnergyRates(gasType) {
+  if (gasType === 'city') return { kw: 12.5,  kcal: 10750 };
+  if (gasType === 'lp')   return { kw: 27.9,  kcal: 24000 };
+  return null;
+}
+function fmtKw(v) {
+  if (v >= 1000) return v.toFixed(0);
+  if (v >= 100)  return v.toFixed(1);
+  if (v >= 10)   return v.toFixed(2);
+  return v.toFixed(3);
+}
+function fmtKcal(v) { return Math.round(v).toLocaleString('ja-JP'); }
+
+// ═══════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════
+function showTab(t) {
+  document.querySelectorAll('.sec').forEach(el => el.classList.remove('on'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('on'));
+  document.getElementById('sec-' + t).classList.add('on');
+  const btns = document.querySelectorAll('.tab-btn');
+  btns[t === 'pole' ? 0 : 1].classList.add('on');
+}
+
+// ═══════════════════════════════════════════
+//  SHARED UTILITIES
+// ═══════════════════════════════════════════
+function fmt(n) {
+  if (!isFinite(n) || isNaN(n)) return '—';
+  if (n >= 10000) return n.toFixed(0);
+  if (n >= 1000)  return n.toFixed(1);
+  if (n >= 100)   return n.toFixed(2);
+  if (n >= 10)    return n.toFixed(3);
+  if (n >= 1)     return n.toFixed(4);
+  if (n >= 0.01)  return n.toFixed(5);
+  return n.toExponential(4);
+}
+
+// ═══════════════════════════════════════════
+//  POLE'S FORMULA — state & logic
+// ═══════════════════════════════════════════
+let pUnk = 'Q', pGas = 'city', pPipeOpen = false, pActiveCell = null;
+let pQUnit = 'm3'; // 'm3' | 'kw' | 'kcal'
+
+function pSetQUnit(unit) {
+  const inp   = document.getElementById('pVQ');
+  const curr  = parseFloat(inp.value);
+  const rates = getEnergyRates(pGas);
+  if (rates && !isNaN(curr) && curr > 0) {
+    const inM3 = pQUnit === 'kw' ? curr / rates.kw : pQUnit === 'kcal' ? curr / rates.kcal : curr;
+    inp.value  = unit === 'kw' ? fmt(inM3 * rates.kw) : unit === 'kcal' ? fmt(inM3 * rates.kcal) : fmt(inM3);
+  }
+  pQUnit = unit;
+  ['m3','kw','kcal'].forEach(u =>
+    document.getElementById('pQU_' + u).classList.toggle('on', u === unit));
+  document.getElementById('pQUnitLabel').textContent =
+    unit === 'kw' ? 'kW' : unit === 'kcal' ? 'kcal/h' : 'm³/h';
+}
+
+function pGetQm3() {
+  const v = parseFloat(document.getElementById('pVQ').value);
+  if (isNaN(v) || v <= 0) return NaN;
+  const rates = getEnergyRates(pGas);
+  if (pQUnit === 'kw')   return rates ? v / rates.kw   : NaN;
+  if (pQUnit === 'kcal') return rates ? v / rates.kcal : NaN;
+  return v;
+}
+
+function pUpdateQUnitSel() {
+  const isUnk = pUnk === 'Q';
+  document.getElementById('pQUnitSel').style.display = isUnk ? 'none' : '';
+  if (isUnk) {
+    if (pQUnit !== 'm3') {
+      pQUnit = 'm3';
+      ['m3','kw','kcal'].forEach(u =>
+        document.getElementById('pQU_' + u).classList.toggle('on', u === 'm3'));
+      document.getElementById('pQUnitLabel').textContent = 'm³/h';
+    }
+  } else {
+    const rates = getEnergyRates(pGas);
+    document.getElementById('pQU_kw').disabled   = !rates;
+    document.getElementById('pQU_kcal').disabled = !rates;
+    if (!rates && pQUnit !== 'm3') {
+      pQUnit = 'm3';
+      ['m3','kw','kcal'].forEach(u =>
+        document.getElementById('pQU_' + u).classList.toggle('on', u === 'm3'));
+      document.getElementById('pQUnitLabel').textContent = 'm³/h';
+      document.getElementById('pVQ').value = '';
+    }
+  }
+}
+
+// Build SGP grid
+(function() {
+  const g = document.getElementById('pPipeGrid');
+  SGP.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'pipe-cell';
+    b.innerHTML = `${p.nom}<small>${p.id} cm</small>`;
+    b.onclick = () => {
+      if (pUnk === 'D') return;
+      document.getElementById('pVD').value = p.id;
+      if (pActiveCell) pActiveCell.classList.remove('chosen');
+      b.classList.add('chosen'); pActiveCell = b;
+    };
+    g.appendChild(b);
+  });
+})();
+
+function pTogglePipe() {
+  pPipeOpen = !pPipeOpen;
+  document.getElementById('pPipeSection').classList.toggle('open', pPipeOpen);
+  document.getElementById('pPipeToggle').textContent =
+    (pPipeOpen ? '▲' : '▼') + '　SGP内径早見表（タップでD自動入力）';
+}
+
+function pSetGas(t) {
+  pGas = t;
+  if (pUnk === 'S') return;
+  const sInp = document.getElementById('pVS');
+  ['pSCity','pSLp','pSCustom'].forEach((id,i) =>
+    document.getElementById(id).classList.toggle('on',
+      (i===0&&t==='city')||(i===1&&t==='lp')||(i===2&&t==='custom')));
+  if (t === 'city')   { sInp.value = '0.638'; sInp.readOnly = true; }
+  else if (t === 'lp'){ sInp.value = '1.550'; sInp.readOnly = true; }
+  else                { sInp.value = ''; sInp.readOnly = false;
+                        sInp.placeholder = '入力'; setTimeout(()=>sInp.focus(),50); }
+  pUpdateQUnitSel();
+}
+
+function pSetUnk(v) {
+  pUnk = v;
+  ['Q','S','L','D','P'].forEach(k => {
+    const inp = document.getElementById('pV'+k);
+    if (k === v) {
+      inp.classList.add('unk'); inp.readOnly = true;
+      inp.value = ''; inp.placeholder = '← 算出';
+    } else {
+      inp.classList.remove('unk'); inp.readOnly = false;
+      if (k === 'S') pSetGas(pGas);
+      else inp.placeholder = '';
+    }
+  });
+  const sDisabled = v === 'S';
+  ['pSCity','pSLp','pSCustom'].forEach(id =>
+    { document.getElementById(id).disabled = sDisabled; });
+  if (sDisabled) ['pSCity','pSLp','pSCustom'].forEach(id =>
+    document.getElementById(id).classList.remove('on'));
+  document.querySelectorAll('#pPipeGrid .pipe-cell').forEach(b => {
+    b.style.opacity = v==='D' ? '0.4' : '1';
+    b.style.pointerEvents = v==='D' ? 'none' : '';
+  });
+  pUpdateQUnitSel();
+  pClearResult(); pClearErr();
+}
+
+function pCorrToggle() {
+  const on = document.getElementById('pCorrOn').checked;
+  document.getElementById('pCorrFields').style.display = on ? 'block' : 'none';
+  pClearResult(); pClearErr();
+}
+
+function pCalc() {
+  pClearErr(); pClearResult();
+  const vals = {};
+  for (const k of ['Q','S','L','D','P']) {
+    if (k === pUnk) continue;
+    let v;
+    if (k === 'Q') {
+      v = pGetQm3();
+      if (isNaN(v) || v <= 0) { pShowErr('「Q」を正しく入力してください'); return; }
+    } else {
+      v = parseFloat(document.getElementById('pV'+k).value);
+      if (isNaN(v) || v <= 0) { pShowErr(`「${k}」を正しく入力してください`); return; }
+    }
+    vals[k] = v;
+  }
+  const { Q, S, L, D, P } = vals;
+
+  const corrOn = document.getElementById('pCorrOn').checked;
+  let h = 0;
+  if (corrOn) {
+    h = parseFloat(document.getElementById('pVH').value);
+    if (isNaN(h)) { pShowErr('高低差 h を入力してください'); return; }
+  }
+  // pCorr(s) = h × G_CORR × (1-s)  [kPa]
+  const pc = (s) => h * G_CORR * (1 - s);
+
+  let r, corrVal = 0;
+  switch (pUnk) {
+    case 'Q': {
+      const dPeff = P + pc(S);
+      if (dPeff <= 0) { pShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      r = K_POLE * Math.pow(D,2.5) * Math.sqrt(dPeff/(S*L));
+      corrVal = pc(S); break;
+    }
+    case 'P': {
+      const dPfric = Q*Q*S*L / (K_POLE*K_POLE * Math.pow(D,5));
+      corrVal = pc(S);
+      r = dPfric - corrVal; break;
+    }
+    case 'D': {
+      const dPeff = P + pc(S);
+      if (dPeff <= 0) { pShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      r = Math.pow(Q*Q*S*L / (K_POLE*K_POLE*dPeff), 0.2);
+      corrVal = pc(S); break;
+    }
+    case 'S': {
+      if (corrOn && h !== 0) {
+        // Q²SL = K²D⁵(P + h·G_CORR·(1-S))  →  S(Q²L + K²D⁵·h·G_CORR) = K²D⁵(P + h·G_CORR)
+        const KD5 = K_POLE*K_POLE * Math.pow(D,5);
+        const den = Q*Q*L + KD5*h*G_CORR;
+        if (Math.abs(den) < 1e-15) { pShowErr('計算不能（分母がゼロ）'); return; }
+        r = KD5 * (P + h*G_CORR) / den;
+      } else {
+        r = K_POLE*K_POLE * Math.pow(D,5)*P / (Q*Q*L);
+      }
+      corrVal = pc(r); break;
+    }
+    case 'L': {
+      const dPeff = P + pc(S);
+      if (dPeff <= 0) { pShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      r = K_POLE*K_POLE * Math.pow(D,5)*dPeff / (Q*Q*S);
+      corrVal = pc(S); break;
+    }
+  }
+
+  if (!isFinite(r) || (pUnk !== 'P' && r <= 0)) {
+    pShowErr('計算結果が不正です。入力値を確認してください。'); return;
+  }
+  const labels = {Q:'流量 Q',S:'比重 S',L:'配管延長 L',D:'口径 D',P:'圧力損失 ΔP'};
+  const units  = {Q:'m³/h', S:'',       L:'m',        D:'cm',   P:'kPa'};
+  document.getElementById('pRLabel').textContent = labels[pUnk] + '　の計算結果';
+  document.getElementById('pRNum').textContent   = fmt(r);
+  document.getElementById('pRUnit').textContent  = units[pUnk];
+
+  const pREnergyEl = document.getElementById('pREnergy');
+  if (pUnk === 'Q') {
+    const rates = getEnergyRates(pGas);
+    pREnergyEl.textContent = rates
+      ? `${fmtKw(r * rates.kw)} kW　／　${fmtKcal(r * rates.kcal)} kcal/h`
+      : '熱量換算：─（その他ガスは換算不可）';
+    pREnergyEl.style.display = '';
+  } else {
+    pREnergyEl.style.display = 'none';
+  }
+
+  let sub = '';
+  if (corrOn) {
+    const sign = corrVal >= 0 ? '+' : '';
+    sub = `高低差補正：${sign}${fmt(corrVal)} kPa（h = ${h} m）`;
+    if (pUnk === 'P') {
+      const dPfric = Q*Q*S*L / (K_POLE*K_POLE * Math.pow(D,5));
+      sub += `\n摩擦損失：${fmt(dPfric)} kPa　→　必要圧力：${fmt(r)} kPa`;
+      if (r < 0) sub += '\n（負の値 = 高低差でガスが自然に流れる）';
+    }
+  }
+  document.getElementById('pRSub').textContent = sub;
+  document.getElementById('pResult').classList.add('show');
+  document.getElementById('pV'+pUnk).value = fmt(r);
+  setTimeout(()=>document.getElementById('pResult').scrollIntoView({behavior:'smooth',block:'nearest'}),60);
+}
+
+function pReset() {
+  pUnk='Q'; pGas='city'; pQUnit='m3';
+  document.getElementById('pRQ').checked = true;
+  ['Q','L','D','P'].forEach(k => {
+    const i=document.getElementById('pV'+k);
+    i.value=''; i.readOnly=false; i.placeholder=''; i.classList.remove('unk');
+  });
+  if (pActiveCell) { pActiveCell.classList.remove('chosen'); pActiveCell=null; }
+  document.getElementById('pCorrOn').checked = false;
+  document.getElementById('pCorrFields').style.display = 'none';
+  document.getElementById('pVH').value = '';
+  document.getElementById('pRSub').textContent = '';
+  pSetUnk('Q'); pSetGas('city'); pClearErr(); pClearResult();
+}
+
+function pShowErr(m) { const e=document.getElementById('pErr'); e.textContent='! '+m; e.classList.add('show'); }
+function pClearErr()  { document.getElementById('pErr').classList.remove('show'); }
+function pClearResult(){
+  document.getElementById('pResult').classList.remove('show');
+  document.getElementById('pREnergy').style.display = 'none';
+}
+
+
+// ═══════════════════════════════════════════
+//  FLEXI PIPE — state & logic
+// ═══════════════════════════════════════════
+let fGas  = 'city';   // 'city' | 'lp' | 'custom'
+let fSize = '15A';    // currently selected pipe size
+let fUnk  = 'P';      // unknown variable
+let fQUnit = 'm3';    // 'm3' | 'kw' | 'kcal'
+
+function fSetQUnit(unit) {
+  const inp   = document.getElementById('fVQ');
+  const curr  = parseFloat(inp.value);
+  const rates = getEnergyRates(fGas);
+  if (rates && !isNaN(curr) && curr > 0) {
+    const inM3 = fQUnit === 'kw' ? curr / rates.kw : fQUnit === 'kcal' ? curr / rates.kcal : curr;
+    inp.value  = unit === 'kw' ? fmt(inM3 * rates.kw) : unit === 'kcal' ? fmt(inM3 * rates.kcal) : fmt(inM3);
+  }
+  fQUnit = unit;
+  ['m3','kw','kcal'].forEach(u =>
+    document.getElementById('fQU_' + u).classList.toggle('on', u === unit));
+  document.getElementById('fQUnitLabel').textContent =
+    unit === 'kw' ? 'kW' : unit === 'kcal' ? 'kcal/h' : 'm³/h';
+}
+
+function fGetQm3() {
+  const v = parseFloat(document.getElementById('fVQ').value);
+  if (isNaN(v) || v <= 0) return NaN;
+  const rates = getEnergyRates(fGas);
+  if (fQUnit === 'kw')   return rates ? v / rates.kw   : NaN;
+  if (fQUnit === 'kcal') return rates ? v / rates.kcal : NaN;
+  return v;
+}
+
+function fUpdateQUnitSel() {
+  const isUnk = fUnk === 'Q';
+  document.getElementById('fQUnitSel').style.display = isUnk ? 'none' : '';
+  if (isUnk) {
+    if (fQUnit !== 'm3') {
+      fQUnit = 'm3';
+      ['m3','kw','kcal'].forEach(u =>
+        document.getElementById('fQU_' + u).classList.toggle('on', u === 'm3'));
+      document.getElementById('fQUnitLabel').textContent = 'm³/h';
+    }
+  } else {
+    const rates = getEnergyRates(fGas);
+    document.getElementById('fQU_kw').disabled   = !rates;
+    document.getElementById('fQU_kcal').disabled = !rates;
+    if (!rates && fQUnit !== 'm3') {
+      fQUnit = 'm3';
+      ['m3','kw','kcal'].forEach(u =>
+        document.getElementById('fQU_' + u).classList.toggle('on', u === 'm3'));
+      document.getElementById('fQUnitLabel').textContent = 'm³/h';
+      document.getElementById('fVQ').value = '';
+    }
+  }
+}
+
+const CITY_SIZES = ['8A','10A','15A','18A','20A','25A','32A'];
+const LPG_SIZES  = ['10A','15A','20A','25A'];
+
+// Build flexi pipe size buttons
+(function() {
+  const g = document.getElementById('fSizeGrid');
+  CITY_SIZES.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'fsize-btn';
+    b.textContent = s;
+    b.id = 'fsBtn_' + s;
+    b.onclick = () => fSelectSize(s);
+    g.appendChild(b);
+  });
+  fSelectSize('15A');
+})();
+
+function fSelectSize(s) {
+  fSize = s;
+  CITY_SIZES.forEach(sz => {
+    const b = document.getElementById('fsBtn_' + sz);
+    if (!b) return;
+    b.classList.toggle('on', sz === s);
+  });
+  fClearResult();
+}
+
+function fSetGas(t) {
+  fGas = t;
+  ['fGasCity','fGasLp','fGasCustom'].forEach((id,i) =>
+    document.getElementById(id).classList.toggle('on',
+      (i===0&&t==='city')||(i===1&&t==='lp')||(i===2&&t==='custom')));
+
+  // Show/hide custom S input
+  document.getElementById('fSRow').style.display = t==='custom' ? 'block' : 'none';
+  if (t==='custom') setTimeout(()=>document.getElementById('fVS').focus(),50);
+
+  // Update available pipe sizes
+  const avail = t === 'lp' ? LPG_SIZES : CITY_SIZES;
+  CITY_SIZES.forEach(sz => {
+    const b = document.getElementById('fsBtn_' + sz);
+    if (!b) return;
+    const ok = avail.includes(sz);
+    b.disabled = !ok;
+    if (!ok && fSize === sz) {
+      // auto-select first available
+      const first = avail[0];
+      fSelectSize(first);
+    }
+  });
+  document.getElementById('fSizeNote').textContent =
+    t === 'lp' ? 'LPG用グラフ対応口径：10A・15A・20A・25A'
+               : '都市ガス用グラフ対応口径：8A〜32A（空気流量換算）';
+
+  fUpdateQUnitSel();
+  fClearResult(); fClearErr();
+}
+
+function fSetUnk(v) {
+  fUnk = v;
+  ['Q','L','P'].forEach(k => {
+    const inp = document.getElementById('fV'+k);
+    if (k === v) {
+      inp.classList.add('unk'); inp.readOnly = true;
+      inp.value = ''; inp.placeholder = '← 算出';
+    } else {
+      inp.classList.remove('unk'); inp.readOnly = false; inp.placeholder = '';
+    }
+  });
+  fUpdateQUnitSel();
+  fClearResult(); fClearErr();
+}
+
+function fCorrToggle() {
+  const on = document.getElementById('fCorrOn').checked;
+  document.getElementById('fCorrFields').style.display = on ? 'block' : 'none';
+  fClearResult(); fClearErr();
+}
+
+function fCalc() {
+  fClearErr(); fClearResult();
+
+  // Get specific gravity
+  let S;
+  if (fGas === 'city')   S = 0.638;
+  else if (fGas === 'lp') S = 1.550;
+  else {
+    S = parseFloat(document.getElementById('fVS').value);
+    if (isNaN(S) || S <= 0) { fShowErr('比重 S を正しく入力してください'); return; }
+  }
+
+  // Get coefficient for selected pipe size
+  const coeff = fGas === 'lp' ? LPG_FLEXI[fSize] : CITY_FLEXI[fSize];
+  if (!coeff) { fShowErr('この組み合わせの口径データがありません'); return; }
+  const { C, n } = coeff;
+
+  // Get the two known values
+  const known = {};
+  for (const k of ['Q','L','P']) {
+    if (k === fUnk) continue;
+    let v;
+    if (k === 'Q') {
+      v = fGetQm3();
+      if (isNaN(v) || v <= 0) { fShowErr('「Q」を正しく入力してください'); return; }
+    } else {
+      v = parseFloat(document.getElementById('fV'+k).value);
+      if (isNaN(v) || v <= 0) { fShowErr(`「${k}」を正しく入力してください`); return; }
+    }
+    known[k] = v;
+  }
+
+  // Elevation correction
+  const corrOn = document.getElementById('fCorrOn').checked;
+  let h = 0;
+  if (corrOn) {
+    h = parseFloat(document.getElementById('fVH').value);
+    if (isNaN(h)) { fShowErr('高低差 h を入力してください'); return; }
+  }
+  const corrVal = h * G_CORR * (1 - S);  // kPa (positive = gas pressure gain)
+
+  let result, dplm, qAir;  // dplm = ΔP/L in mmH₂O/m
+
+  if (fGas === 'lp') {
+    if (fUnk === 'P') {
+      dplm   = C * Math.pow(known.Q, n);
+      result = dplm * known.L * MMH2O_KPA - corrVal;
+    } else if (fUnk === 'Q') {
+      const dPeff = known.P + corrVal;
+      if (dPeff <= 0) { fShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      dplm   = dPeff * KPA_MMH2O / known.L;
+      result = Math.pow(dplm / C, 1/n);
+    } else { // L
+      dplm   = C * Math.pow(known.Q, n);
+      const dPeff = known.P + corrVal;
+      if (dPeff <= 0) { fShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      result = dPeff * KPA_MMH2O / dplm;
+    }
+  } else {
+    // City gas / custom: Qair = √S × Qgas
+    if (fUnk === 'P') {
+      qAir   = Math.sqrt(S) * known.Q;
+      dplm   = C * Math.pow(qAir, n);
+      result = dplm * known.L * MMH2O_KPA - corrVal;
+    } else if (fUnk === 'Q') {
+      const dPeff = known.P + corrVal;
+      if (dPeff <= 0) { fShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      dplm   = dPeff * KPA_MMH2O / known.L;
+      qAir   = Math.pow(dplm / C, 1/n);
+      result = qAir / Math.sqrt(S);
+    } else { // L
+      qAir   = Math.sqrt(S) * known.Q;
+      dplm   = C * Math.pow(qAir, n);
+      const dPeff = known.P + corrVal;
+      if (dPeff <= 0) { fShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
+      result = dPeff * KPA_MMH2O / dplm;
+    }
+  }
+
+  if (!isFinite(result) || (fUnk !== 'P' && result <= 0)) {
+    fShowErr('計算結果が不正です。入力値を確認してください。');
+    return;
+  }
+
+  const labels = { Q:'流量 Q', L:'配管延長 L', P:'圧力損失 ΔP' };
+  const units  = { Q:'m³/h',  L:'m',          P:'kPa'         };
+  document.getElementById('fRLabel').textContent = labels[fUnk] + '　の計算結果';
+  document.getElementById('fRNum').textContent   = fmt(result);
+  document.getElementById('fRUnit').textContent  = units[fUnk];
+
+  const fREnergyEl = document.getElementById('fREnergy');
+  if (fUnk === 'Q') {
+    const rates = getEnergyRates(fGas);
+    fREnergyEl.textContent = rates
+      ? `${fmtKw(result * rates.kw)} kW　／　${fmtKcal(result * rates.kcal)} kcal/h`
+      : '熱量換算：─（その他ガスは換算不可）';
+    fREnergyEl.style.display = '';
+  } else {
+    fREnergyEl.style.display = 'none';
+  }
+
+  let sub = `単位圧力損失：${fmt(dplm)} mmH₂O/m　（${fmt(dplm * MMH2O_KPA * 1000)} Pa/m）`;
+  if (fGas !== 'lp' && qAir !== undefined) {
+    sub += `\n空気換算流量：${fmt(qAir)} m³/h（Qair = √${fmt(S)} × Qgas）`;
+  }
+  if (corrOn) {
+    const sign = corrVal >= 0 ? '+' : '';
+    sub += `\n高低差補正：${sign}${fmt(corrVal)} kPa（h = ${h} m）`;
+    if (fUnk === 'P' && result < 0) sub += '\n（負の値 = 高低差でガスが自然に流れる）';
+  }
+  document.getElementById('fRSub').textContent = sub;
+  document.getElementById('fResult').classList.add('show');
+  document.getElementById('fV'+fUnk).value = fmt(result);
+  setTimeout(()=>document.getElementById('fResult').scrollIntoView({behavior:'smooth',block:'nearest'}),60);
+}
+
+function fReset() {
+  fUnk = 'P'; fQUnit = 'm3';
+  document.getElementById('fRP').checked = true;
+  ['Q','L','P'].forEach(k => {
+    const i=document.getElementById('fV'+k);
+    i.value=''; i.readOnly=false; i.placeholder=''; i.classList.remove('unk');
+  });
+  fSetUnk('P');
+  fSetGas('city');
+  fSelectSize('15A');
+  document.getElementById('fVS').value = '';
+  document.getElementById('fCorrOn').checked = false;
+  document.getElementById('fCorrFields').style.display = 'none';
+  document.getElementById('fVH').value = '';
+  fClearErr(); fClearResult();
+}
+
+function fShowErr(m) { const e=document.getElementById('fErr'); e.textContent='! '+m; e.classList.add('show'); }
+function fClearErr()  { document.getElementById('fErr').classList.remove('show'); }
+function fClearResult(){
+  document.getElementById('fResult').classList.remove('show');
+  document.getElementById('fREnergy').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+document.getElementById('pRQ').checked = true;
+pSetUnk('Q');
+
+document.getElementById('fRP').checked = true;
+fSetUnk('P');
+fSetGas('city');
+</script>
+</body>
+</html>
