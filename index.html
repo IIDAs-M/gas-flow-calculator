@@ -558,17 +558,11 @@
 // ═══════════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════════
-const K_POLE     = 7.139;       // Pole's formula kPa constant
-                                 // Low pressure: K=0.707 (mmAq, D[cm], Q[m³/h])
-                                 // K_kPa = 0.707 × √101.972 = 7.139
-const MMH2O_KPA  = 0.00980665;  // 1 mmH₂O → kPa
-const KPA_MMH2O  = 101.972;     // 1 kPa → mmH₂O
-const G_CORR     = 1.293 * 9.80665 / 1000; // ≈ 0.012677 kPa/m per (1-S) — elevation correction
+const K_POLE     = 7.139;
+const MMH2O_KPA  = 0.00980665;
+const KPA_MMH2O  = 101.972;
+const G_CORR     = 1.293 * 9.80665 / 1000;
 
-// ─── Flexible pipe power-law coefficients ───
-// City gas: ΔP/L [mmH₂O/m] = C × Qair^n   (Qair = √S × Qgas)
-// Calibrated at ΔP/L=1.0 for each pipe's reference air flow from the graph.
-// n=1.85 for all city gas sizes.
 const CITY_FLEXI = {
   '8A' : { C: 16.4,   n: 1.85, qMin:0.07, qMax:0.50  },
   '10A': { C: 2.42,   n: 1.85, qMin:0.15, qMax:1.2   },
@@ -578,7 +572,6 @@ const CITY_FLEXI = {
   '25A': { C: 0.0735, n: 1.85, qMin:1.0,  qMax:8.0   },
   '32A': { C: 0.0241, n: 1.85, qMin:1.5,  qMax:12.0  },
 };
-// LPG: ΔP/L [mmH₂O/m] = C × Qlpg^n   (direct LPG flow, n=2.0)
 const LPG_FLEXI = {
   '10A': { C: 3.43,   n: 2.0, qMin:0.1,  qMax:1.2  },
   '15A': { C: 0.783,  n: 2.0, qMin:0.2,  qMax:2.5  },
@@ -586,7 +579,6 @@ const LPG_FLEXI = {
   '25A': { C: 0.0556, n: 2.0, qMin:0.7,  qMax:8.0  },
 };
 
-// SGP inner diameters for Pole's formula reference
 const SGP = [
   {nom:'15A', id:1.61}, {nom:'20A', id:2.16},
   {nom:'25A', id:2.76}, {nom:'32A', id:3.60},
@@ -596,9 +588,6 @@ const SGP = [
   {nom:'150A',id:15.52},{nom:'200A',id:20.40},
 ];
 
-// ═══════════════════════════════════════════
-//  ENERGY CONVERSION HELPERS
-// ═══════════════════════════════════════════
 function getEnergyRates(gasType) {
   if (gasType === 'city') return { kw: 12.5,  kcal: 10750 };
   if (gasType === 'lp')   return { kw: 27.9,  kcal: 24000 };
@@ -612,9 +601,6 @@ function fmtKw(v) {
 }
 function fmtKcal(v) { return Math.round(v).toLocaleString('ja-JP'); }
 
-// ═══════════════════════════════════════════
-//  TAB SWITCHING
-// ═══════════════════════════════════════════
 function showTab(t) {
   document.querySelectorAll('.sec').forEach(el => el.classList.remove('on'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('on'));
@@ -623,9 +609,6 @@ function showTab(t) {
   btns[t === 'pole' ? 0 : 1].classList.add('on');
 }
 
-// ═══════════════════════════════════════════
-//  SHARED UTILITIES
-// ═══════════════════════════════════════════
 function fmt(n) {
   if (!isFinite(n) || isNaN(n)) return '—';
   if (n >= 10000) return n.toFixed(0);
@@ -637,11 +620,8 @@ function fmt(n) {
   return n.toExponential(4);
 }
 
-// ═══════════════════════════════════════════
-//  POLE'S FORMULA — state & logic
-// ═══════════════════════════════════════════
 let pUnk = 'Q', pGas = 'city', pPipeOpen = false, pActiveCell = null;
-let pQUnit = 'm3'; // 'm3' | 'kw' | 'kcal'
+let pQUnit = 'm3';
 
 function pSetQUnit(unit) {
   const inp   = document.getElementById('pVQ');
@@ -691,7 +671,6 @@ function pUpdateQUnitSel() {
   }
 }
 
-// Build SGP grid
 (function() {
   const g = document.getElementById('pPipeGrid');
   SGP.forEach(p => {
@@ -784,7 +763,6 @@ function pCalc() {
     h = parseFloat(document.getElementById('pVH').value);
     if (isNaN(h)) { pShowErr('高低差 h を入力してください'); return; }
   }
-  // pCorr(s) = h × G_CORR × (1-s)  [kPa]
   const pc = (s) => h * G_CORR * (1 - s);
 
   let r, corrVal = 0;
@@ -808,7 +786,6 @@ function pCalc() {
     }
     case 'S': {
       if (corrOn && h !== 0) {
-        // Q²SL = K²D⁵(P + h·G_CORR·(1-S))  →  S(Q²L + K²D⁵·h·G_CORR) = K²D⁵(P + h·G_CORR)
         const KD5 = K_POLE*K_POLE * Math.pow(D,5);
         const den = Q*Q*L + KD5*h*G_CORR;
         if (Math.abs(den) < 1e-15) { pShowErr('計算不能（分母がゼロ）'); return; }
@@ -885,13 +862,10 @@ function pClearResult(){
 }
 
 
-// ═══════════════════════════════════════════
-//  FLEXI PIPE — state & logic
-// ═══════════════════════════════════════════
-let fGas  = 'city';   // 'city' | 'lp' | 'custom'
-let fSize = '15A';    // currently selected pipe size
-let fUnk  = 'P';      // unknown variable
-let fQUnit = 'm3';    // 'm3' | 'kw' | 'kcal'
+let fGas  = 'city';
+let fSize = '15A';
+let fUnk  = 'P';
+let fQUnit = 'm3';
 
 function fSetQUnit(unit) {
   const inp   = document.getElementById('fVQ');
@@ -944,7 +918,6 @@ function fUpdateQUnitSel() {
 const CITY_SIZES = ['8A','10A','15A','18A','20A','25A','32A'];
 const LPG_SIZES  = ['10A','15A','20A','25A'];
 
-// Build flexi pipe size buttons
 (function() {
   const g = document.getElementById('fSizeGrid');
   CITY_SIZES.forEach(s => {
@@ -974,11 +947,9 @@ function fSetGas(t) {
     document.getElementById(id).classList.toggle('on',
       (i===0&&t==='city')||(i===1&&t==='lp')||(i===2&&t==='custom')));
 
-  // Show/hide custom S input
   document.getElementById('fSRow').style.display = t==='custom' ? 'block' : 'none';
   if (t==='custom') setTimeout(()=>document.getElementById('fVS').focus(),50);
 
-  // Update available pipe sizes
   const avail = t === 'lp' ? LPG_SIZES : CITY_SIZES;
   CITY_SIZES.forEach(sz => {
     const b = document.getElementById('fsBtn_' + sz);
@@ -986,7 +957,6 @@ function fSetGas(t) {
     const ok = avail.includes(sz);
     b.disabled = !ok;
     if (!ok && fSize === sz) {
-      // auto-select first available
       const first = avail[0];
       fSelectSize(first);
     }
@@ -1023,7 +993,6 @@ function fCorrToggle() {
 function fCalc() {
   fClearErr(); fClearResult();
 
-  // Get specific gravity
   let S;
   if (fGas === 'city')   S = 0.638;
   else if (fGas === 'lp') S = 1.550;
@@ -1032,12 +1001,10 @@ function fCalc() {
     if (isNaN(S) || S <= 0) { fShowErr('比重 S を正しく入力してください'); return; }
   }
 
-  // Get coefficient for selected pipe size
   const coeff = fGas === 'lp' ? LPG_FLEXI[fSize] : CITY_FLEXI[fSize];
   if (!coeff) { fShowErr('この組み合わせの口径データがありません'); return; }
   const { C, n } = coeff;
 
-  // Get the two known values
   const known = {};
   for (const k of ['Q','L','P']) {
     if (k === fUnk) continue;
@@ -1052,16 +1019,15 @@ function fCalc() {
     known[k] = v;
   }
 
-  // Elevation correction
   const corrOn = document.getElementById('fCorrOn').checked;
   let h = 0;
   if (corrOn) {
     h = parseFloat(document.getElementById('fVH').value);
     if (isNaN(h)) { fShowErr('高低差 h を入力してください'); return; }
   }
-  const corrVal = h * G_CORR * (1 - S);  // kPa (positive = gas pressure gain)
+  const corrVal = h * G_CORR * (1 - S);
 
-  let result, dplm, qAir;  // dplm = ΔP/L in mmH₂O/m
+  let result, dplm, qAir;
 
   if (fGas === 'lp') {
     if (fUnk === 'P') {
@@ -1072,14 +1038,13 @@ function fCalc() {
       if (dPeff <= 0) { fShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
       dplm   = dPeff * KPA_MMH2O / known.L;
       result = Math.pow(dplm / C, 1/n);
-    } else { // L
+    } else {
       dplm   = C * Math.pow(known.Q, n);
       const dPeff = known.P + corrVal;
       if (dPeff <= 0) { fShowErr('有効圧力損失が 0 以下です。高低差・圧力値を確認してください。'); return; }
       result = dPeff * KPA_MMH2O / dplm;
     }
   } else {
-    // City gas / custom: Qair = √S × Qgas
     if (fUnk === 'P') {
       qAir   = Math.sqrt(S) * known.Q;
       dplm   = C * Math.pow(qAir, n);
@@ -1090,7 +1055,7 @@ function fCalc() {
       dplm   = dPeff * KPA_MMH2O / known.L;
       qAir   = Math.pow(dplm / C, 1/n);
       result = qAir / Math.sqrt(S);
-    } else { // L
+    } else {
       qAir   = Math.sqrt(S) * known.Q;
       dplm   = C * Math.pow(qAir, n);
       const dPeff = known.P + corrVal;
@@ -1160,9 +1125,6 @@ function fClearResult(){
   document.getElementById('fREnergy').style.display = 'none';
 }
 
-// ═══════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════
 document.getElementById('pRQ').checked = true;
 pSetUnk('Q');
 
